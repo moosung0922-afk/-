@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 조리 타이머</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 사용 (Tailwind 기본 설정) */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* 밝은 배경 */
+            color: #1f2937; /* 어두운 텍스트 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .timer-display {
+            font-family: monospace;
+            font-weight: 700;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 폰트 크기 반응형 조정 */
+        @media (max-width: 640px) {
+            .timer-display {
+                font-size: 4rem; /* 모바일에서 조금 작게 */
+            }
+        }
+
+        /* 버튼 호버/활성 효과 */
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="w-full max-w-lg bg-white p-8 md:p-10 rounded-3xl shadow-2xl transition-all duration-300">
+    <!-- Header -->
+    <h1 class="text-3xl font-bold text-center text-red-600 mb-6 border-b-2 border-red-200 pb-3">🍜 완벽한 라면 조리 타이머</h1>
+
+    <!-- Ramen Selection -->
+    <div class="mb-6">
+        <label for="ramen-select" class="block text-lg font-semibold text-gray-700 mb-2">라면 종류 선택:</label>
+        <select id="ramen-select" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-red-500 focus:border-red-500 text-lg shadow-md transition-shadow">
+            <!-- Options will be populated by JS -->
+        </select>
+    </div>
+
+    <!-- Timer Display -->
+    <div class="text-center mb-6 p-6 bg-gray-50 rounded-2xl shadow-inner">
+        <div id="timer-display" class="timer-display text-7xl text-gray-900 leading-none">00:00</div>
+        <p id="ramen-name-display" class="text-xl font-medium text-gray-500 mt-2"></p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="mb-8 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg shadow-inner">
+        <h2 class="text-xl font-bold text-yellow-800 mb-2">🔥 조리 팁</h2>
+        <p id="ramen-instructions" class="text-gray-700 font-medium"></p>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex space-x-4">
+        <button id="start-btn" class="flex-1 btn-primary bg-red-600 text-white p-4 rounded-xl text-xl font-bold transition duration-200 shadow-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            타이머 시작
+        </button>
+        <button id="reset-btn" class="btn-secondary w-24 bg-blue-500 text-white p-4 rounded-xl text-xl font-bold transition duration-200 shadow-lg hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-1.921-1.077m-4.73 1.144L14 14m-1.745-1.163l1.163 1.745" />
+            </svg>
+            초기화
+        </button>
+    </div>
+
+    <!-- Completion Message Box -->
+    <div id="message-box" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-sm w-full animate-pulse-once">
+            <p id="message-text" class="text-3xl font-extrabold text-red-600 mb-4">🎉 라면 완성! 🎉</p>
+            <p class="text-lg text-gray-700 mb-6">지금 바로 맛있게 드세요!</p>
+            <button id="close-message-btn" class="bg-blue-500 text-white p-3 rounded-lg w-full font-bold hover:bg-blue-600 transition">닫기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === 라면 데이터 정의 (첨부된 이미지 레시피 기반) ===
+    const ramenData = [
+        { name: '라면을 선택해주세요', key: 'default', time: 0, instructions: '라면 종류를 선택하고 \'시작\' 버튼을 누르세요. 첨부된 레시피를 참고했습니다.' },
+        { name: '신라면', key: 'shin', time: 270, instructions: '물 550ml 끓이기 → 면, 스프(건더기 포함) 넣고 4분 30초 끓이기. (최적의 면발을 위해 3분 30초에 치즈 한 장 투하 추천!)' },
+        { name: '너구리', key: 'neoguri', time: 300, instructions: '물 550ml 끓이기 → 면, 스프(건더기 포함) 넣고 5분 끓이기. (오동통한 면발이 핵심! 해산물 첨가 추천)' },
+        { name: '짜파게티', key: 'chapagetti', time: 300, instructions: '물 600ml 끓이기 → 면, 건더기 넣고 5분 끓이기 → 물 8숟가락만 남기고 버리기 → 스프, 유성스프 넣고 비비기(볶기) → 완성. (계란 후라이와 함께 드세요!)' },
+        { name: '안성탕면', key: 'anseong', time: 270, instructions: '물 550ml 끓이기 → 면, 스프(건더기 포함) 넣고 4분 30초 끓이기. (국물 맛 살리기를 위해 재래식 된장 약간 첨가 추천)' },
+        { name: '불닭볶음면', key: 'buldak', time: 300, instructions: '물 600ml 끓이기 → 면 넣고 5분 끓이기 → 물 8숟가락만 남기고 버리기 → 액상, 후레이크 넣고 비비기 → 완성.' },
+        { name: '삼양라면', key: 'samyang', time: 210, instructions: '물 550ml 끓이기 → 면, 스프(건더기 포함) 넣고 3분 30초 끓이기. (파, 버섯 등 간단한 야채 추가 추천)' },
+        { name: '진라면 (순한/매운맛)', key: 'jin', time: 240, instructions: '물 550ml 끓이기 → 면, 스프(건더기 포함) 넣고 4분 끓이기. (만두, 김치 등 다양한 토핑 추가하여 드셔보세요!)' },
+        { name: '비빔면', key: 'bibim', time: 180, instructions: '물 500~600ml 끓이기 → 면 넣고 3분 끓이기 → 면 건져서 찬물로 헹구기 → 스프 넣고 비비기 → 완성. (삶은 계란, 오이채 추가 필수!)' },
+        { name: '왕뚜껑 (컵라면)', key: 'cup', time: 210, instructions: '뚜껑 열고 스프 넣기 → 뜨거운 물 붓기 → 뚜껑 닫고 3분 30초 기다리기 → 완성. (봉지면 기준이 아니니 주의!)' },
+    ];
+
+    // === DOM 요소 변수 설정 ===
+    const selectElement = document.getElementById('ramen-select');
+    const timerDisplay = document.getElementById('timer-display');
+    const ramenNameDisplay = document.getElementById('ramen-name-display');
+    const instructionsDisplay = document.getElementById('ramen-instructions');
+    const startButton = document.getElementById('start-btn');
+    const resetButton = document.getElementById('reset-btn');
+    const messageBox = document.getElementById('message-box');
+    const closeMessageBtn = document.getElementById('close-message-btn');
+
+    // === 상태 변수 ===
+    let totalSeconds = 0; // 현재 선택된 라면의 총 조리 시간 (초)
+    let timeRemaining = 0; // 남은 시간 (초)
+    let timerInterval = null;
+    let isRunning = false;
+    let isInitialLoad = true; // 초기 로딩 상태
+
+    // === 타이머 함수 ===
+
+    /**
+     * 시간을 MM:SS 형식으로 포맷합니다.
+     * @param {number} seconds - 남은 시간(초)
+     * @returns {string} 포맷된 문자열
+     */
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * 타이머를 업데이트하고 0이 되면 완료 처리합니다.
+     */
+    function updateTimer() {
+        if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isRunning = false;
+            timeRemaining = 0;
+            startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg> 다시 시작`;
+            startButton.disabled = true; // 0 되면 시작 버튼 비활성화
+            resetButton.disabled = false; // 초기화만 가능
+            selectElement.disabled = false; // 선택창 다시 활성화
+            
+            showCompletionMessage();
+            playBeepSound();
+            
+        } else {
+            timeRemaining--;
+        }
+        timerDisplay.textContent = formatTime(timeRemaining);
+    }
+
+    /**
+     * 타이머 시작/일시정지 토글
+     */
+    function toggleTimer() {
+        if (timeRemaining === 0 && totalSeconds > 0) {
+            // 시간이 0이고 시작을 누르면 초기 시간으로 재설정 후 시작 (재시작)
+            timeRemaining = totalSeconds;
+        }
+
+        if (timeRemaining > 0) {
+            if (isRunning) {
+                // 일시정지
+                clearInterval(timerInterval);
+                timerInterval = null;
+                isRunning = false;
+                startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg> 다시 시작`;
+            } else {
+                // 시작
+                timerInterval = setInterval(updateTimer, 1000);
+                isRunning = true;
+                startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg> 일시 정지`;
+                selectElement.disabled = true; // 타이머 실행 중에는 선택창 비활성화
+                resetButton.disabled = false;
+            }
+        }
+    }
+
+    /**
+     * 타이머를 초기 설정 시간으로 재설정합니다.
+     */
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        isRunning = false;
+        
+        // 현재 선택된 라면 정보 다시 가져오기
+        const selectedRamenKey = selectElement.value;
+        const selectedRamen = ramenData.find(r => r.key === selectedRamenKey) || ramenData[0];
+        
+        totalSeconds = selectedRamen.time;
+        timeRemaining = totalSeconds;
+        
+        timerDisplay.textContent = formatTime(timeRemaining);
+        
+        // 초기화 후 버튼 상태 설정
+        startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg> 타이머 시작`;
+        
+        startButton.disabled = totalSeconds === 0;
+        resetButton.disabled = totalSeconds === 0;
+        selectElement.disabled = false;
+    }
+
+    /**
+     * 타이머 완료 시 소리(비프음)를 재생합니다.
+     */
+    function playBeepSound() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioContext();
+            
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // 소리 설정
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            
+            oscillator.start();
+            // 0.5초 후 정지
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        } catch (e) {
+            console.error("Audio playback failed:", e);
+        }
+    }
+
+    /**
+     * 타이머 완료 메시지 박스를 표시합니다.
+     */
+    function showCompletionMessage() {
+        messageBox.style.display = 'flex';
+        // 애니메이션을 위해 잠시 후 opacity 변경
+        setTimeout(() => {
+            messageBox.style.opacity = '1';
+        }, 10);
+    }
+
+    /**
+     * 메시지 박스를 닫고 타이머를 초기화 상태로 돌립니다.
+     */
+    function closeCompletionMessage() {
+        messageBox.style.display = 'none';
+        messageBox.style.opacity = '0';
+        resetTimer(); // 메시지 닫으면 타이머 초기화
+    }
+
+    // === 이벤트 핸들러 및 초기화 ===
+
+    /**
+     * 라면 종류 선택 시 타이머와 설명을 업데이트합니다.
+     */
+    function handleRamenChange() {
+        const selectedRamenKey = selectElement.value;
+        const selectedRamen = ramenData.find(r => r.key === selectedRamenKey);
+
+        if (selectedRamen) {
+            totalSeconds = selectedRamen.time;
+            timeRemaining = totalSeconds;
+            
+            timerDisplay.textContent = formatTime(timeRemaining);
+            ramenNameDisplay.textContent = selectedRamen.name;
+            instructionsDisplay.textContent = selectedRamen.instructions;
+            
+            // 타이머가 0 이상일 때만 버튼 활성화
+            const isDisabled = totalSeconds === 0;
+            startButton.disabled = isDisabled;
+            resetButton.disabled = isDisabled;
+            
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg> 타이머 시작`;
+            } else {
+                startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg> 타이머 시작`;
+            }
+        }
+    }
+
+    /**
+     * 초기화 함수
+     */
+    function initializeApp() {
+        // 1. 셀렉트 박스 옵션 채우기
+        ramenData.forEach(ramen => {
+            const option = document.createElement('option');
+            option.value = ramen.key;
+            option.textContent = `${ramen.name} (${formatTime(ramen.time)})`;
+            selectElement.appendChild(option);
+        });
+
+        // 2. 초기 상태 설정
+        handleRamenChange(); // default 상태 로드
+
+        // 3. 이벤트 리스너 연결
+        selectElement.addEventListener('change', handleRamenChange);
+        startButton.addEventListener('click', toggleTimer);
+        resetButton.addEventListener('click', resetTimer);
+        closeMessageBtn.addEventListener('click', closeCompletionMessage);
+    }
+
+    // 앱 시작
+    initializeApp();
+
+</script>
+</body>
+</html>
